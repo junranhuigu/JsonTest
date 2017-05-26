@@ -1,6 +1,7 @@
 package com.test;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -18,6 +19,7 @@ public class WorldMap {
 	private int[][] rewardBoxIds;//已领取宝箱id
 	private List<List<List<Integer>>> branchPassIds;//已通关支线任务id 再此队列中的支线任务可扫荡
 	private TemporaryAttackStage temporaryStage;//角色进攻关卡信息
+	private HashMap<Integer, Task> map;
 	
 	public WorldMap() {
 		// TODO Auto-generated constructor stub
@@ -31,6 +33,7 @@ public class WorldMap {
 		this.caves = new ArrayList<>();
 		this.refreshTime = System.currentTimeMillis();
 		this.rewardBoxIds = new int[3][];
+		this.map = new HashMap<>();
 //		this.branchPassIds = new ArrayList<>();
 	}
 	
@@ -106,5 +109,13 @@ public class WorldMap {
 	}
 	public void setTemporaryStage(TemporaryAttackStage temporaryStage) {
 		this.temporaryStage = temporaryStage;
+	}
+
+	public HashMap<Integer, Task> getMap() {
+		return map;
+	}
+
+	public void setMap(HashMap<Integer, Task> map) {
+		this.map = map;
 	}
 }

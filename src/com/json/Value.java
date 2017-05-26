@@ -5,10 +5,13 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
@@ -22,7 +25,7 @@ public class Value {
 	private List<JsonObject> objs = new ArrayList<>();
 	private List<JsonArray> arrays = new ArrayList<>();
 	private List<Object> sequence = new ArrayList<>();//具体的json对象结构顺序
-	private Class[] cs = {String.class, Short.class, Byte.class, Integer.class, Long.class, Boolean.class, Character.class, Float.class, Double.class};
+	private static Class[] cs = {String.class, Short.class, Byte.class, Integer.class, Long.class, Boolean.class, Character.class, Float.class, Double.class};
 	
 	public void generateValue(StateValue value) throws Exception{
 		genAttrs(value);
@@ -60,8 +63,8 @@ public class Value {
 	/**
 	 * 判断某个类是否为基础类的封装类或者String
 	 * */
-	private boolean inSimpleEncapsolution(Class<?> cls){
-		for(Class c : cs){
+	private static boolean inSimpleEncapsolution(Class<?> cls){
+		for(Class<?> c : cs){
 			if(c == cls){
 				return true;
 			}
@@ -131,7 +134,16 @@ public class Value {
 					}
 				}
 				if(_obj != null){
-					method.invoke(t, parseObject(f.getType(), _obj));
+					if(Map.class.isAssignableFrom(f.getType())){//Map
+						ParameterizedType pt = (ParameterizedType) f.getGenericType();
+						Type[] types = pt.getActualTypeArguments();
+						Class keyCls = (Class) types[0];
+						Class valueCls = (Class) types[1];
+						Map map = parseMap(keyCls, valueCls, _obj);
+						method.invoke(t, map);
+					} else {//Object
+						method.invoke(t, parseObject(f.getType(), _obj));
+					}
 				}
 			}
 		}
@@ -234,27 +246,69 @@ public class Value {
 		return o;
 	}
 	
-//	private <T> List<Object> parseArray(T t, Field field, JsonArray array){
-//		List<Object> list = new ArrayList<>();
-//		ParameterizedType type = (ParameterizedType) field.getGenericType();
-//		Class<?> fieldCls = (Class<?>) type.getActualTypeArguments()[0];//该成员的泛型类
-//		if(fieldCls.isPrimitive() || inSimpleEncapsolution(fieldCls)){
-//			for(Attr a : array.attrs){
-//				list.add(getValue(a, fieldCls));
-//			}
-//		} else if(Collection.class.isAssignableFrom(fieldCls) || fieldCls.isArray()){//Array
-//			ParameterizedType pt = (ParameterizedType) type.getActualTypeArguments()[0];
-//			Class<?> _fCls = (Class<?>) type.getActualTypeArguments()[0];//该成员的泛型类
-//			for(JsonArray a : array.arrays){
-//				list.add(parseArray(t, field, array));
-//			}
-//		} else {//Object
-//			
-//		}
-//	}
+	private Map parseMap(Class<?> keyCls, Class<?> valueCls, JsonObject obj) throws Exception{
+		if(!inSimpleEncapsolution(keyCls)){
+			throw new Exception(keyCls.getName() + "作为Map类型key值无法解析，目前key值仅支持基础类型");
+		}
+		Map map = new HashMap<>();
+		for(Attr attr : obj.attrs){
+			Attr a = new Attr();
+			a.value = attr.name;
+			Object key = getValue(a, keyCls);
+			Object value = getValue(attr, valueCls);
+			if(key == null && value == null){
+				continue;
+			} else {
+				map.put(key, value);
+			}
+		}
+		for(JsonArray array : obj.arrays){
+			Attr a = new Attr();
+			a.value = array.name;
+			Object key = getValue(a, keyCls);
+			Object value = parseArray(valueCls, array);
+			if(key == null && value == null){
+				continue;
+			} else {
+				map.put(key, value);
+			}
+		}
+		for(JsonObject o : obj.objs){
+			Attr a = new Attr();
+			a.value = o.name;
+			Object key = getValue(a, keyCls);
+			Object value = parseObject(valueCls, o);
+			if(key == null && value == null){
+				continue;
+			} else {
+				map.put(key, value);
+			}
+		}
+		return map;
+	}
 	
 	private Object root(){
 		return sequence.get(0);
+	}
+	
+	public Object parse(String content, Class<?> cls) throws Exception{
+		Object o = null;
+		if(inSimpleEncapsolution(cls)){
+			Attr a = new Attr();
+			a.value = content;
+			o = getValue(a, cls);
+		} else {//key是个复合类
+			Value v = Analysis.analysis(content);
+			Object root = v.root();
+			if(root instanceof JsonObject){
+				JsonObject ro = (JsonObject) root;
+				o = parseObject(cls, ro);
+			} else if(root instanceof JsonArray){
+				JsonArray ra = (JsonArray) root;
+				o = parseArray(cls, ra);
+			}
+		}
+		return o;
 	}
 	
 	@Override
