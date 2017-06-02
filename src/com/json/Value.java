@@ -20,18 +20,98 @@ import com.json.StateValue.Matcher;
 /**
  * json对应的数据结构
  * */
-public class Value {
+class Value {
 	private List<Attr> attrs = new ArrayList<>();
 	private List<JsonObject> objs = new ArrayList<>();
 	private List<JsonArray> arrays = new ArrayList<>();
 	private List<Object> sequence = new ArrayList<>();//具体的json对象结构顺序
-	private static Class[] cs = {String.class, Short.class, Byte.class, Integer.class, Long.class, Boolean.class, Character.class, Float.class, Double.class};
 	
-	public void generateValue(StateValue value) throws Exception{
+	public Value(StateValue value) {
 		genAttrs(value);
 		assembleObjectAndArray();
 	}
 	
+	/**
+	 * 获取根节点
+	 * */
+	private Object root(){
+		return sequence.get(0);
+	}
+	/**
+	 * 提取json中的所有key值
+	 * @return key key值 value 该key值出现的次数
+	 * */
+	public Map<String, Integer> jsonKeys(){
+		Counter<String> counter = new Counter<>();
+		for(Attr attr : this.attrs){
+			if(!StringUtil.isEmpty(attr.name)){
+				counter.add(attr.name);
+			}
+		}
+		for(JsonObject obj : this.objs){
+			if(!StringUtil.isEmpty(obj.name)){
+				counter.add(obj.name);
+			}
+		}
+		for(JsonArray array : this.arrays){
+			if(!StringUtil.isEmpty(array.name)){
+				counter.add(array.name);
+			}
+		}
+		return counter.getResult();
+	}
+	/**
+	 * 提取json中的所有value值
+	 * @return key value值 value 该value值出现的次数
+	 * */
+	public Map<String, Integer> jsonValues(){
+		Counter<String> counter = new Counter<>();
+		for(Attr attr : this.attrs){
+			if(!StringUtil.isEmpty(attr.value)){
+				counter.add(attr.value);
+			}
+		}
+		return counter.getResult();
+	}
+	/**
+	 * 输出json的数据结构
+	 * */
+	public Set<String> jsonStructure(){
+		Object obj = sequence.get(0);
+		HashSet<String> set = new HashSet<>();
+		if(obj instanceof JsonObject){
+			JsonObject o = (JsonObject) obj;
+			o.structureString(set, "root");
+		} else if(obj instanceof JsonArray){
+			JsonArray a = (JsonArray) obj;
+			a.structureString(set, "root");
+		}
+		return set;
+	}
+	
+	public Object parse(String content, Class<?> cls) throws Exception{
+		Object o = null;
+		if(ClassUtil.getInstance().inSimpleEncapsolution(cls)){
+			Attr a = new Attr();
+			a.value = content;
+			o = getValue(a, cls);
+		} else {//key是个复合类
+			Value v = Analysis.analysis(content);
+			Object root = v.root();
+			if(root instanceof JsonObject){
+				JsonObject ro = (JsonObject) root;
+				o = parseObject(cls, ro);
+			} else if(root instanceof JsonArray){
+				JsonArray ra = (JsonArray) root;
+				o = parseArray(cls, ra);
+			}
+		}
+		return o;
+	}
+	
+	/**
+	 * 解析后的json字符串内容
+	 * */
 	public String rootJsonString(){
 		Object obj = sequence.get(0);
 		if(obj instanceof JsonObject){
@@ -61,19 +141,7 @@ public class Value {
 	}
 	
 	/**
-	 * 判断某个类是否为基础类的封装类或者String
-	 * */
-	private static boolean inSimpleEncapsolution(Class<?> cls){
-		for(Class<?> c : cs){
-			if(c == cls){
-				return true;
-			}
-		}
-		return false;
-	}
-	
-	/**
-	 * 将自身转为封装类
+	 * 将obj转为封装类
 	 * */
 	private <T> T parseObject(Class<T> cls, JsonObject obj) throws Exception{
 		T t = cls.newInstance();
@@ -82,12 +150,12 @@ public class Value {
 				continue;
 			}
 			Method method = t.getClass().getMethod("set" + StringUtil.upperFirstLetter(f.getName()), f.getType());
-			if(f.getType().isPrimitive() || inSimpleEncapsolution(f.getType())){//Attr
+			if(f.getType().isPrimitive() || ClassUtil.getInstance().inSimpleEncapsolution(f.getType())){//Attr
 				Attr attr = null;
 				for(Attr a : obj.attrs){
 					if(f.getName().equals(a.name)){
 						attr = a;
-						obj.attrs.remove(a);
+//						obj.attrs.remove(a);
 						break;
 					}
 				}
@@ -99,7 +167,7 @@ public class Value {
 				for(JsonArray a : obj.arrays){
 					if(f.getName().equals(a.name)){
 						array = a;
-						obj.arrays.remove(a);
+//						obj.arrays.remove(a);
 						break;
 					}
 				}
@@ -150,9 +218,12 @@ public class Value {
 		return t;
 	}
 	
+	/**
+	 * 将array转为封装类列表
+	 * */
 	private <T> List<T> parseArray(Class<T> cls, JsonArray array) throws Exception{
 		List<T> list = new ArrayList<>();
-		if(cls.isPrimitive() || inSimpleEncapsolution(cls)){
+		if(cls.isPrimitive() || ClassUtil.getInstance().inSimpleEncapsolution(cls)){
 			for(int i = 0; i < array.attrs.size(); ++ i){
 				T t = (T) getValue(array.attrs.get(i), cls);
 				list.add(t);
@@ -179,7 +250,7 @@ public class Value {
 		List list = new ArrayList<>();
 		try {//最后一层
 			Class typeCls = (Class) type.getActualTypeArguments()[0];
-			if(inSimpleEncapsolution(typeCls)){
+			if(ClassUtil.getInstance().inSimpleEncapsolution(typeCls)){
 				for(Attr attr : array.attrs){
 					list.add(getValue(attr, typeCls));
 				}
@@ -203,6 +274,9 @@ public class Value {
 		method.invoke(t, value);
 	}
 	
+	/**
+	 * 获取基础值
+	 * */
 	private Object getValue(Attr attr, Class<?> paramClass){
 		Object value = null;
 		if(paramClass == int.class || paramClass == Integer.class){
@@ -247,7 +321,7 @@ public class Value {
 	}
 	
 	private Map parseMap(Class<?> keyCls, Class<?> valueCls, JsonObject obj) throws Exception{
-		if(!inSimpleEncapsolution(keyCls)){
+		if(!ClassUtil.getInstance().inSimpleEncapsolution(keyCls)){
 			throw new Exception(keyCls.getName() + "作为Map类型key值无法解析，目前key值仅支持基础类型");
 		}
 		Map map = new HashMap<>();
@@ -285,30 +359,6 @@ public class Value {
 			}
 		}
 		return map;
-	}
-	
-	private Object root(){
-		return sequence.get(0);
-	}
-	
-	public Object parse(String content, Class<?> cls) throws Exception{
-		Object o = null;
-		if(inSimpleEncapsolution(cls)){
-			Attr a = new Attr();
-			a.value = content;
-			o = getValue(a, cls);
-		} else {//key是个复合类
-			Value v = Analysis.analysis(content);
-			Object root = v.root();
-			if(root instanceof JsonObject){
-				JsonObject ro = (JsonObject) root;
-				o = parseObject(cls, ro);
-			} else if(root instanceof JsonArray){
-				JsonArray ra = (JsonArray) root;
-				o = parseArray(cls, ra);
-			}
-		}
-		return o;
 	}
 	
 	@Override
@@ -362,11 +412,9 @@ public class Value {
 				}
 				break;
 			case State.ARRAY_FINISH:
-//				lastArray().open = false;
 				sequence.add(State.ARRAY_FINISH);
 				break;
 			case State.OBJECT_FINISH:
-//				lastObject().open = false;
 				sequence.add(State.OBJECT_FINISH);
 				break;
 			case State.OBJECT://初始对象
@@ -479,18 +527,34 @@ public class Value {
 	}
 	
 	
-	private class Attr{
+	public class Attr{
 		String name;//属性名
 		String value;//属性值
 		
 		public String jsonString() {
 			StringBuilder builder = new StringBuilder();
-			builder.append("\"").append(name).append("\" : \"").append(value).append("\"");
+			if(name == null){
+				builder.append("\"").append(value).append("\"");
+			} else {
+				builder.append("\"").append(name).append("\" : \"").append(value).append("\"");
+			}
 			return builder.toString();
 		}
 		
 		public String simpleMsg(){
 			return name + " : " + value;
+		}
+		
+		/**
+		 * 获取结构字符串
+		 * @param structure 用于存放结构字符串的容器
+		 * @param parentStructureString 父类字符串
+		 * */
+		public void structureString(Set<String> structure, String parentStructureString){
+			if(!StringUtil.isEmpty(name)){
+				parentStructureString += "." + name;
+			}
+			structure.add(parentStructureString);
 		}
 		
 		@Override
@@ -511,7 +575,7 @@ public class Value {
 			return false;
 		}
 	}
-	private class JsonArray{
+	public class JsonArray{
 		String name;//属性名
 		List<JsonObject> objs;//属性值-复合封装类
 		List<JsonArray> arrays;//属性值-数组
@@ -549,6 +613,28 @@ public class Value {
 			}
 			builder.append("]");
 			return builder.toString();
+		}
+		
+		/**
+		 * 获取结构字符串
+		 * @param structure 用于存放结构字符串的容器
+		 * @param parentStructureString 父类字符串
+		 * */
+		public void structureString(Set<String> structure, String parentStructureString){
+			if(!StringUtil.isEmpty(name)){
+				parentStructureString += "." + name;
+			}
+			parentStructureString += "{Array}";
+			structure.add(parentStructureString);
+			for(Attr attr : this.attrs){
+				attr.structureString(structure, parentStructureString);
+			}
+			for(JsonObject obj : this.objs){
+				obj.structureString(structure, parentStructureString);
+			}
+			for(JsonArray array : this.arrays){
+				array.structureString(structure, parentStructureString);
+			}
 		}
 		
 		@Override
@@ -608,7 +694,7 @@ public class Value {
 			return false;
 		}
 	}
-	private class JsonObject{
+	public class JsonObject{
 		String name;//属性名
 		List<JsonObject> objs;//属性值-复合封装类
 		List<JsonArray> arrays;//属性值-数组
@@ -646,6 +732,28 @@ public class Value {
 			}
 			builder.append("}");
 			return builder.toString();
+		}
+		
+		/**
+		 * 获取结构字符串
+		 * @param structure 用于存放结构字符串的容器
+		 * @param parentStructureString 父类字符串
+		 * */
+		public void structureString(Set<String> structure, String parentStructureString){
+			if(!StringUtil.isEmpty(name)){
+				parentStructureString += "." + name;
+			} 
+			parentStructureString += "{Object}";
+			structure.add(parentStructureString);
+			for(Attr attr : this.attrs){
+				attr.structureString(structure, parentStructureString);
+			}
+			for(JsonObject obj : this.objs){
+				obj.structureString(structure, parentStructureString);
+			}
+			for(JsonArray array : this.arrays){
+				array.structureString(structure, parentStructureString);
+			}
 		}
 		
 		@Override

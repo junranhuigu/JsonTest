@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * 初步解析获取状态机对应内容
  * */
-public class StateValue {
+class StateValue {
 	private List<Matcher> contents = new ArrayList<>();
 	
 	public void add(int state, String stateName){

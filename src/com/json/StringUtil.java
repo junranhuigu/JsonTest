@@ -7,7 +7,7 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class StringUtil {
+class StringUtil {
 	/**
 	 * 验证字符串是否为空
 	 * */

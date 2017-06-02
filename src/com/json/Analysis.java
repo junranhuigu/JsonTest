@@ -89,8 +89,7 @@ class Analysis {
 //			System.out.println("nowChar : " + c + ", " + state);
 		}
 //		System.out.println(state.getValue());
-		Value value = new Value();
-		value.generateValue(state.getValue());
+		Value value = new Value(state.getValue());
 //		System.out.println(value);
 //		System.out.println(value.rootJsonString());
 		return value;

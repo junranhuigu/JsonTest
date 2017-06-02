@@ -118,4 +118,6 @@ public class WorldMap {
 	public void setMap(HashMap<Integer, Task> map) {
 		this.map = map;
 	}
+
+
 }
