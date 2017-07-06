@@ -43,6 +43,7 @@ public class JSON {
 	
 	/**
 	 * json数据结构的初步解析结果
+	 * @param detail 显示详细信息
 	 * */
 	public static String jsonStructure(String json) throws Exception{
 		Value value = Analysis.analysis(json);
@@ -53,5 +54,13 @@ public class JSON {
 			builder.append(list.get(i)).append("\n");
 		}
 		return builder.toString();
+	}
+	
+	/**
+	 * 使用语句获取json中的数据
+	 * @param executeLanguage 执行语句
+	 * */
+	public static List<Object> select(String executeLanguage, String json){
+		return GroovyService.execute(executeLanguage, json);
 	}
 }
