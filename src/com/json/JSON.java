@@ -61,6 +61,15 @@ public class JSON {
 	 * @param executeLanguage 执行语句
 	 * */
 	public static List<Object> select(String executeLanguage, String json){
-		return GroovyService.execute(executeLanguage, json);
+		return GroovyService.execute4One(executeLanguage, json);
+	}
+	
+	/**
+	 * 使用语句获取json中的数据
+	 * @param executeLanguage 多个执行语句
+	 * @return key 执行语句 value 执行结果
+	 * */
+	public static Map<String, List<Object>> select(List<String> executeLanguage, String json){
+		return GroovyService.execute4Some(executeLanguage, json);
 	}
 }

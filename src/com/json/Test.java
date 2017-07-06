@@ -1,6 +1,8 @@
 package com.json;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 import com.test.Task;
 import com.test.WorldMap;
@@ -31,7 +33,15 @@ class Test {
 		System.out.println(JSON.jsonValues(json));
 		System.out.println(JSON.jsonStructure(json));
 		
-		System.out.println(JSON.select("root.weaponList.exp", json));
-		System.out.println(JSON.select("root.weaponList[0].exp", json));
+		List<String> commands = new ArrayList<>();
+		commands.add("root.cardList.id");
+		commands.add("root.cardList[0].id");
+		
+		System.out.println(JSON.select(commands.get(0), json));
+		System.out.println(JSON.select(commands.get(1), json));
+		
+		System.out.println(JSON.select(commands, json));
+		
+		
 	}
 }
